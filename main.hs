@@ -93,6 +93,26 @@ appendFieldView :: WidgetT (HandlerSite m) IO () -> Field m a -> Field m a
 appendFieldView w (Field parse view enctype) = Field parse (\a b c d e -> view a b c d e >> w) enctype
 
 ------------------
+-- Wrapping automatically instead of giving the user an enctype to deal with
+------------------
+
+runFormPostBuild :: RenderMessage site FormMessage => Route site -> (Html -> MForm (HandlerT site IO) (FormResult a, WidgetT site IO ())) -> HandlerT site IO (FormResult a, WidgetT site IO ())
+runFormPostBuild route form = do
+  ((res, widget), enctype) <- runFormPost form
+  return (res, formWrap route widget enctype "post")
+
+runFormGetBuild :: Route site -> (Html -> MForm (HandlerT site IO) (FormResult a, WidgetT site IO ())) -> HandlerT site IO (FormResult a, WidgetT site IO ())
+runFormGetBuild route form = do
+  ((res, widget), enctype) <- runFormGet form
+  return (res, formWrap route widget enctype "get")
+
+formWrap :: Route site -> WidgetT site IO () -> Enctype -> Text -> WidgetT site IO ()
+formWrap route widget enctype method = [whamlet|$newline never
+<form action="@{route}" enctype="#{enctype}" method="get">
+  ^{widget}
+|]
+
+------------------
 -- Random other yesod stuff
 ------------------
 
