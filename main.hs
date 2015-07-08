@@ -46,6 +46,17 @@ mapField fwd bck (Field parse view enctype) = Field
   (\a b c d e -> view a b c (fmap fwd d) e)
   enctype
 
+mapField :: Monad m => (a -> b) -> (b -> Either (SomeMessage (HandlerSite m)) a) -> Field m b -> Field m a
+mapField fwd bck (Field parse view enctype) = Field
+  (\ts fis -> do
+     eres <- parse ts fis 
+     return $ eres >>= (\mb -> case mb of
+       Just b  -> Just <$> bck b 
+       Nothing -> Right Nothing)
+  )
+  (\a b c d e -> view a b c (fmap fwd d) e)
+  enctype
+
 yamlFieldWithHelp :: (FromJSON a, ToJSON a, Monad m, RenderMessage (HandlerSite m) FormMessage) 
                   => a -> Field m a
 yamlFieldWithHelp example = appendFieldView w $ mapField fwd bck textareaField'
@@ -77,6 +88,9 @@ textareaFieldLarge = f { fieldParse = fieldParse f
           Nothing -> ("rows","20") : xs
           Just _ -> xs
         f = mapField Textarea (Right . unTextarea) (textareaField :: Field m Textarea)
+
+appendFieldView :: WidgetT (HandlerSite m) IO () -> Field m a -> Field m a
+appendFieldView w (Field parse view enctype) = Field parse (\a b c d e -> view a b c d e >> w) enctype
 
 ------------------
 -- Random other yesod stuff
