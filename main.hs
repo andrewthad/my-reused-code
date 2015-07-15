@@ -5,6 +5,11 @@
 foreach :: Functor f => f a -> (a -> b) -> f b
 foreach = flip fmap
 
+readsMaybe :: ReadS a -> String -> Maybe a
+readsMaybe f s = case filter (null . snd) (f s) of
+  ((a, _):_) -> Just a
+  _ -> Nothing
+
 --------------
 -- Helpers for stealing JSON instances from an isomorphic type
 -------------
@@ -13,6 +18,14 @@ isoParseJSON i v = view (mapping (from i)) (parseJSON v)
 
 isoToJSON :: ToJSON a => Iso' b a -> b -> Value
 isoToJSON i b = toJSON (view i b)
+
+prismParseJSON :: FromJSON a => Prism' a b -> Value -> Parser b
+prismParseJSON p v = parseJSON v >>= \a -> case a ^? p of
+  Nothing -> fail "representation conversion was unsuccessful"
+  Just b  -> return b
+
+prismToJSON :: ToJSON a => Prism' a b -> b -> Value
+prismToJSON p b = toJSON $ withPrism p $ \f _ -> f b
 
 -------------------
 -- Helpers for automatically generating PersistField instances
@@ -92,6 +105,9 @@ textareaFieldLarge = f { fieldParse = fieldParse f
 appendFieldView :: WidgetT (HandlerSite m) IO () -> Field m a -> Field m a
 appendFieldView w (Field parse view enctype) = Field parse (\a b c d e -> view a b c d e >> w) enctype
 
+bft :: Text -> FieldSettings site
+bft = bfs
+
 ------------------
 -- Wrapping automatically instead of giving the user an enctype to deal with
 ------------------
@@ -108,7 +124,7 @@ runFormGetBuild route form = do
 
 formWrap :: Route site -> WidgetT site IO () -> Enctype -> Text -> WidgetT site IO ()
 formWrap route widget enctype method = [whamlet|$newline never
-<form action="@{route}" enctype="#{enctype}" method="get">
+<form action="@{route}" enctype="#{enctype}" method="#{method}">
   ^{widget}
 |]
 
