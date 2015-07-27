@@ -10,6 +10,18 @@ readsMaybe f s = case filter (null . snd) (f s) of
   ((a, _):_) -> Just a
   _ -> Nothing
 
+------------------
+-- Helpers for errors
+------------------
+data MiscException = MiscException String
+  deriving (Show,Typeable)
+instance Exception MiscException
+
+fromJustThrowStr :: MonadThrow m => String -> Maybe a -> m a
+fromJustThrowStr s m = case m of
+  Nothing -> throwM (MiscException s)
+  Just a  -> return a
+
 --------------
 -- Helpers for stealing JSON instances from an isomorphic type
 -------------
